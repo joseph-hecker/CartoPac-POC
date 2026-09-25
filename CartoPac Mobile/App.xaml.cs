@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
-namespace CartoPac_Mobile
+﻿namespace CartoPac_Mobile
 {
     public partial class App : Application
     {

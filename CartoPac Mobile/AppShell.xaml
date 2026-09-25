@@ -4,11 +4,18 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:CartoPac_Mobile"
-    Title="CartoPac_Mobile">
+    Shell.FlyoutBehavior="Disabled"
+    Title="CartoPac Mobile">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+    <TabBar>
+        <ShellContent
+            Title="Map"
+            ContentTemplate="{DataTemplate local:MapPage}"
+            Route="MapPage" />
+        <ShellContent
+            Title="Settings"
+            ContentTemplate="{DataTemplate local:SettingsPage}"
+            Route="SettingsPage" />
+    </TabBar>
 
 </Shell>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CartoPac_Mobile.SettingsPage"
+             Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="12">
+            <Label Text="Location Settings" Style="{StaticResource SubHeadline}" />
+
+            <Picker x:Name="ProviderPicker"
+                    Title="Select Location Provider"
+                    SelectedIndexChanged="OnProviderChanged" />
+
+            <Grid x:Name="TcpOptions"
+                  ColumnDefinitions="80,*"
+                  ColumnSpacing="12"
+                  RowDefinitions="Auto,Auto"
+                  RowSpacing="8"
+                  IsVisible="False">
+                <Label Grid.Row="0" Grid.Column="0" Text="Host" FontSize="Small" VerticalOptions="Center" />
+                <Entry Grid.Row="0" Grid.Column="1" x:Name="TcpHostEntry" Placeholder="127.0.0.1" Completed="OnEditComplete" IsEnabled="False" />
+                <Label Grid.Row="1" Grid.Column="0" Text="Port" FontSize="Small" VerticalOptions="Center" />
+                <Entry Grid.Row="1" Grid.Column="1" x:Name="TcpPortEntry" Placeholder="3678" Keyboard="Numeric" Completed="OnEditComplete" IsEnabled="False" />
+            </Grid>
+
+            <Grid x:Name="BluetoothOptions"
+                  ColumnDefinitions="80,*"
+                  ColumnSpacing="12"
+                  RowDefinitions="Auto,Auto"
+                  RowSpacing="8"
+                  IsVisible="False">
+                <Label Grid.Row="0" Grid.Column="0" Text="COM Port" VerticalOptions="Center" />
+                <Entry Grid.Row="0" Grid.Column="1" x:Name="ComPortEntry"  Completed="OnEditComplete" />
+                <Label Grid.Row="1" Grid.Column="0" Text="Baud Rate" VerticalOptions="Center" />
+                <Entry Grid.Row="1" Grid.Column="1" x:Name="BaudRateEntry" Placeholder="9600" Keyboard="Numeric" Completed="OnEditComplete" />
+            </Grid>
+
+            <Grid x:Name="TextFileOptions"
+                  ColumnDefinitions="80,*"
+                  ColumnSpacing="12"
+                  RowDefinitions="Auto,Auto"
+                  RowSpacing="4"
+                  IsVisible="False">
+                <Label Grid.Row="0" Grid.Column="0" Text="Nmea File" FontSize="Micro" VerticalOptions="Center" />
+                <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label x:Name="NmeaFileLabel"
+                           LineBreakMode="TailTruncation"
+                           VerticalOptions="Center" />
+                    <Button Grid.Column="1"
+                            Text="Browse Files"
+                            Clicked="OnPickNmeaFileClicked"
+                            Padding="12,6" />
+                </Grid>
+            </Grid>
+
+            <Button Text="Connect"
+                    Clicked="OnConnectClicked"
+                    HorizontalOptions="Fill"
+                    Margin="0,8,0,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
