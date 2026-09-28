@@ -5,20 +5,9 @@ namespace CartoPac_Mobile.GNSS;
 
 public sealed class InternalGpsHelper : IInternalGPSHelper
 {
-    private TimeSpan PollInterval { get; } = TimeSpan.FromMilliseconds(1000);
+    private TimeSpan PollInterval { get; } = TimeSpan.FromMilliseconds(500);
     private CancellationTokenSource? Source { get; set; }
     private Action<GPSLocation>? OnNewLocation { get; set; }
-
-    public async Task<bool> EnsurePermissionsAsync(CancellationToken ct = default)
-    {
-        PermissionStatus status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
-        if (status != PermissionStatus.Granted)
-        {
-            status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-        }
-
-        return status == PermissionStatus.Granted;
-    }
 
     public void Start(Action<GPSLocation> onNewLocation)
     {
@@ -36,11 +25,22 @@ public sealed class InternalGpsHelper : IInternalGPSHelper
         OnNewLocation = null;
     }
 
+    public async Task<bool> EnsurePermissionsAsync(CancellationToken ct = default)
+    {
+        PermissionStatus status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+        if (status != PermissionStatus.Granted)
+        {
+            status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+        }
+
+        return status == PermissionStatus.Granted;
+    }
+
     private async Task PollAsync(CancellationToken ct)
     {
         if (!await EnsurePermissionsAsync(ct))
         {
-            return;
+            throw new PermissionException("Location permissions are not granted.");
         }
 
         GeolocationRequest request = new(GeolocationAccuracy.Best);
@@ -60,16 +60,9 @@ public sealed class InternalGpsHelper : IInternalGPSHelper
 
                 Source?.Token.WaitHandle.WaitOne(PollInterval);
             }
-            catch (OperationCanceledException)
+            catch (Exception)
             {
-                break;
-            }
-            catch (PermissionException)
-            {
-                break;
-            }
-            catch (FeatureNotSupportedException)
-            {
+                Stop();
                 break;
             }
         }

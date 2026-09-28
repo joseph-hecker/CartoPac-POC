@@ -15,6 +15,7 @@ public sealed class LocationService
     private IMapCenterSource? MapCenterSource { get; set; }
     private InternalGpsHelper InternalGPSHelper { get; } = new();
 
+    public bool IsDeviceGnssActive { get; set; }
 
     public event GPS.OnLocationUpdatedEventHandler? OnLocationUpdated
     {
@@ -22,7 +23,10 @@ public sealed class LocationService
         remove => GPS.OnLocationUpdated -= value;
     }
 
-    public void RegisterMapCenterSource(IMapCenterSource source) => MapCenterSource = source;
+    public void RegisterMapCenterSource(IMapCenterSource source)
+    {
+        MapCenterSource = source;
+    }
 
     public void UnregisterMapCenterSource(IMapCenterSource source)
     {
@@ -32,7 +36,47 @@ public sealed class LocationService
         }
     }
 
-    private ProviderType GetLocationProviderSettings(out Dictionary<string, string>? providerOptions)
+    public void ConnectGPS()
+    {
+        ProviderType provider;
+        switch (provider = GetLocationProviderSettings(out Dictionary<string, string>? options))
+        {
+
+            case ProviderType.InternalGPS:
+                GPS.Connect(InternalGPSHelper);
+                break;
+
+            case ProviderType.Bluetooth:
+            case ProviderType.TCP:
+            case ProviderType.TextFile:
+                if (options is null)
+                {
+                    throw new ArgumentNullException(nameof(options));
+                }
+
+                GPS.Connect(provider, options);
+                break;
+        }
+    }
+
+    public void DisconnectGPS()
+    {
+        GPS.Disconnect();
+    }
+
+    public void EnableGNSS()
+    {
+        IsDeviceGnssActive = true;
+        GPS.StartUpdatingLocation();
+    }
+
+    public void DisableGNSS()
+    {
+        IsDeviceGnssActive = false;
+        GPS.StopUpdatingLocation();
+    }
+
+    private static ProviderType GetLocationProviderSettings(out Dictionary<string, string>? providerOptions)
     {
         ProviderType provider = Enum.Parse<ProviderType>(Preferences.Get(Options.Provider, string.Empty));
         providerOptions = provider switch
@@ -55,53 +99,5 @@ public sealed class LocationService
         };
 
         return provider;
-    }
-
-    public void Connect()
-    {
-        ProviderType provider;
-        switch (provider = GetLocationProviderSettings(out Dictionary<string, string>? options))
-        {
-
-            case ProviderType.InternalGPS:
-                GPS.Connect(InternalGPSHelper);
-                break;
-
-            case ProviderType.Bluetooth:
-            case ProviderType.TCP:
-            case ProviderType.TextFile:
-                if (options is null)
-                {
-                    throw new ArgumentNullException(nameof(options));
-                }
-
-                GPS.Connect(provider, options);
-                break;
-
-            case ProviderType.Map:
-            default:
-                if (MapCenterSource is null)
-                {
-                    throw new ArgumentNullException(nameof(MapCenterSource));
-                }
-
-                GPS.Connect(new MapHelper(MapCenterSource.TryGetMapCenter));
-                break;
-        }
-    }
-
-    public void Disconnect()
-    {
-        GPS.Disconnect();
-    }
-
-    public void EnableGNSS()
-    {
-        GPS.StartUpdatingLocation();
-    }
-
-    public void DisableGNSS()
-    {
-        GPS.StopUpdatingLocation();
     }
 }

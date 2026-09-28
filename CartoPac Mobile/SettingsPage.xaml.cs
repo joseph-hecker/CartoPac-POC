@@ -1,7 +1,6 @@
 using CartoPac_Mobile.GNSS;
 using CartoPac_Mobile.Services;
 using GNSS;
-using System.Collections.ObjectModel;
 
 namespace CartoPac_Mobile;
 
@@ -20,7 +19,7 @@ public partial class SettingsPage : ContentPage
     public SettingsPage()
     {
         InitializeComponent();
-        ProviderPicker.ItemsSource = LocationService.AvailableProviders.Select(p => p.Key).ToList();
+        ProviderPicker.ItemsSource = LocationService.AvailableProviders.Values.ToList();
     }
 
     protected override void OnAppearing()
@@ -28,11 +27,25 @@ public partial class SettingsPage : ContentPage
         base.OnAppearing();
         LocationService = ServiceHelper.GetRequiredService<LocationService>();
         LoadSettings();
+        OnProviderChanged(ProviderPicker, new());
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
     }
 
     private ProviderType GetSelectedProvider()
     {
-        return Enum.Parse<ProviderType>(ProviderPicker.SelectedItem.ToString() ?? string.Empty);
+        foreach (KeyValuePair<ProviderType, string> provider in LocationService.AvailableProviders)
+        {
+            if (ProviderPicker.SelectedItem as string == provider.Value)
+            {
+                return provider.Key;
+            }
+        }
+
+        return ProviderType.InternalGPS;
     }
 
     private void SaveSettings()
@@ -43,18 +56,19 @@ public partial class SettingsPage : ContentPage
         Preferences.Set(Options.Port, TcpPortEntry.Text);
         Preferences.Set(Options.COMPort, ComPortEntry.Text);
         Preferences.Set(Options.BaudRate, BaudRateEntry.Text);
-        Preferences.Set(Options.NmeaFile, NmeaFileLabel.Text);
+        Preferences.Set(Options.NmeaFile, NmeaFile);
     }
 
     private void LoadSettings()
     {
-        ProviderPicker.SelectedItem = Preferences.Get(Options.Provider, string.Empty);
         TcpHostEntry.Text = Preferences.Get(Options.Host, TcpHostEntry.Placeholder);
         TcpPortEntry.Text = Preferences.Get(Options.Port, TcpPortEntry.Placeholder);
         ComPortEntry.Text = Preferences.Get(Options.COMPort, string.Empty);
         BaudRateEntry.Text = Preferences.Get(Options.BaudRate, string.Empty);
         NmeaFile = Preferences.Get(Options.NmeaFile, string.Empty);
         NmeaFileLabel.Text = Path.GetFileName(NmeaFile);
+        ProviderType provider = Enum.Parse<ProviderType>(Preferences.Get(Options.Provider, ProviderType.InternalGPS.ToString()));
+        ProviderPicker.SelectedItem = LocationService.AvailableProviders[provider];
     }
 
     private void OnEditComplete(object? sender, EventArgs e)
@@ -101,7 +115,7 @@ public partial class SettingsPage : ContentPage
     {
         try
         {
-            LocationService?.Connect();
+            LocationService?.ConnectGPS();
             await DisplayAlertAsync("GNSS", "Connection was successful.", "OK");
         }
         catch (Exception ex)

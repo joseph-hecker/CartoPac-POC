@@ -3,24 +3,55 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maplibre="clr-namespace:MapLibreNative.Maui.Handlers;assembly=MapLibreNative.Maui.Handlers"
+             xmlns:overlays="clr-namespace:MapLibreNative.Maui.Handlers.Overlays;assembly=MapLibreNative.Maui.Handlers"
              x:Class="CartoPac_Mobile.MapPage"
              x:Name="MapPageRoot"
              Title="Map">
 
     <Grid>
         <maplibre:MapLibreMap x:Name="Map"
-                              StyleUrl="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-                              MyLocationEnabled="True"
-                              ShowGpsControl="False"
-                              ShowNavigationControls="False" />
+                              StyleUrl="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json">
 
-        <Button x:Name="GnssToggleButton"
-                Text="GNSS Off"
-                Clicked="OnGnssToggleClicked"
-                HorizontalOptions="Start"
-                VerticalOptions="Start"
-                Margin="12"
-                Padding="12,8" />
+            <overlays:Circle x:Name="LocationPuck"
+                             IsVisible="True"
+                             FillColor="DeepSkyBlue"
+                             StrokeColor="DeepSkyBlue"
+                             StrokeWidth="1" />
+
+            <overlays:Circle x:Name="LocationPuckAccuracyRing"
+                             IsVisible="True"
+                             FillColor="LightSkyBlue"
+                             StrokeColor="SkyBlue"
+                             StrokeWidth="1" />
+
+        </maplibre:MapLibreMap>
+
+        <VerticalStackLayout HorizontalOptions="Start"
+                           VerticalOptions="Start"
+                           Margin="12"
+                           Spacing="4">
+            
+            <HorizontalStackLayout Spacing="8"
+                                   VerticalOptions="Center">
+                <Label Text="GNSS"
+                       VerticalOptions="Center"
+                       FontSize="Medium"
+                       TextColor="Black" />
+                <Switch x:Name="GnssSwitch"
+                        IsToggled="False"
+                        Toggled="OnGnssToggled"
+                        VerticalOptions="Center"
+                        OnColor="#1E88E5" />
+            </HorizontalStackLayout>
+            
+            <Label x:Name="CoordinatesLabel"
+                   Text="Lat: —&#x0a;Lon: —"
+                   FontSize="Medium"
+                   TextColor="Black"
+                   HorizontalOptions="Start"
+                   HorizontalTextAlignment="Start" />
+            
+        </VerticalStackLayout>
 
     </Grid>
 

@@ -7,7 +7,7 @@ namespace CartoPac_Mobile.GNSS;
 /// </summary>
 public sealed class MapHelper(Func<GPSLocation?> tryGetMapCenter) : IMapHelper
 {
-    private TimeSpan PollInterval { get; } = TimeSpan.FromMilliseconds(500);
+    private TimeSpan PollInterval { get; } = TimeSpan.FromMilliseconds(100);
     private Timer? PollTimer { get; set; }
     private Action<GPSLocation>? OnNewLocation { get; set; }
 
