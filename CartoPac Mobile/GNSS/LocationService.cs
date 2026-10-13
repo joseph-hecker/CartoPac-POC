@@ -12,6 +12,10 @@ public sealed class LocationService
         { ProviderType.TextFile, "Text File" }
     };
 
+    private static GPS _deviceGPS = new();
+    private static GPS _mapGPS = new();
+    private GPS GPS { get; set; } = _mapGPS;
+
     private IMapCenterSource? MapCenterSource { get; set; }
     private InternalGpsHelper InternalGPSHelper { get; } = new();
 
@@ -26,10 +30,12 @@ public sealed class LocationService
     public void RegisterMapCenterSource(IMapCenterSource source)
     {
         MapCenterSource = source;
+        _mapGPS.Connect(new MapHelper(() => MapCenterSource.GetMapCenter()));
     }
 
     public void UnregisterMapCenterSource(IMapCenterSource source)
     {
+        _mapGPS.Disconnect();
         if (ReferenceEquals(MapCenterSource, source))
         {
             MapCenterSource = null;
@@ -43,7 +49,7 @@ public sealed class LocationService
         {
 
             case ProviderType.InternalGPS:
-                GPS.Connect(InternalGPSHelper);
+                _deviceGPS.Connect(InternalGPSHelper);
                 break;
 
             case ProviderType.Bluetooth:
@@ -54,26 +60,30 @@ public sealed class LocationService
                     throw new ArgumentNullException(nameof(options));
                 }
 
-                GPS.Connect(provider, options);
+                _deviceGPS.Connect(provider, options);
                 break;
         }
     }
 
     public void DisconnectGPS()
     {
-        GPS.Disconnect();
+        _deviceGPS.Disconnect();
     }
 
     public void EnableGNSS()
     {
         IsDeviceGnssActive = true;
-        GPS.StartUpdatingLocation();
+        _mapGPS.StopUpdatingLocation();
+        _deviceGPS.StartUpdatingLocation();
+        GPS = _deviceGPS;
     }
 
     public void DisableGNSS()
     {
         IsDeviceGnssActive = false;
-        GPS.StopUpdatingLocation();
+        _deviceGPS.StopUpdatingLocation();
+        _mapGPS.StartUpdatingLocation();
+        GPS = _mapGPS;
     }
 
     private static ProviderType GetLocationProviderSettings(out Dictionary<string, string>? providerOptions)
