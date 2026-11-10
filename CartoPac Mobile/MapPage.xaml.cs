@@ -2,43 +2,22 @@ using CartoPac_Mobile.GNSS;
 using CartoPac_Mobile.Services;
 using GNSS;
 using GNSS.Nmea;
+using GNSS.Workflows;
 using MapLibreNative.Maui.Geometry;
 using MapLibreNative.Maui.Handlers;
-using MapLibreNative.Maui.Handlers.EventArgs;
-using Microsoft.Maui.Devices.Sensors;
-using System.Linq.Expressions;
+using MapLibreNative.Maui.Handlers.Overlays;
 
 namespace CartoPac_Mobile;
 
 public partial class MapPage : ContentPage, IMapCenterSource
 {
-    public const double FortCollinsLatitude = 40.5853;
-    public const double FortCollinsLongitude = -105.0844;
-    public const double InitialZoom = 12;
-
-    private const double PuckDiameterDp = 14;
-    private const double MinAccuracyRadiusMeters = 5;
-    private const double FollowZoomMinimum = 14;
-
-    /// <summary>MapLibre <c>REASON_API_GESTURE</c> — user pan, pinch, rotate, etc.</summary>
-    private const int CameraReasonApiGesture = 1;
-
     private LocationService? LocationService { get; set; }
-    private bool _initialCameraApplied;
-    private bool _isMapGesturing;
-    private int _initialCameraScheduleAttempts;
-    private GPSData? _lastLocationFix;
-
-    /// <summary>
-    /// Controls puck visibility and whether the camera follows location updates.
-    /// </summary>
-    public LocationPuckMode PuckTrackingMode { get; set; } = LocationPuckMode.Show;
 
     public MapPage()
     {
         InitializeComponent();
+        Map.CameraIdle += OnCameraIdle;
         Map.StyleLoaded += (_, _) => ScheduleInitialCamera();
-        Map.CameraIdleCommand = new Command(OnCameraIdle);
     }
 
     #region IMapCenterSource Members
@@ -48,7 +27,7 @@ public partial class MapPage : ContentPage, IMapCenterSource
         MapSpan region = Map.VisibleRegion 
             ?? throw new InvalidOperationException();
 
-        return new GPSLocation(region.Center.Latitude, region.Center.Longitude);
+        return new GPSLocation(region.Center.Latitude, region.Center.Longitude, FixQuality: FixQuality.Simulation, UTC: DateTime.UtcNow);
     }
 
     #endregion
@@ -58,7 +37,6 @@ public partial class MapPage : ContentPage, IMapCenterSource
         base.OnAppearing();
         LocationService = ServiceHelper.GetRequiredService<LocationService>();
         LocationService.RegisterMapCenterSource(this);
-        LocationService.OnLocationUpdated += OnLocationUpdated;
         GnssSwitch.IsToggled = LocationService.IsDeviceGnssActive;
         if (LocationService.IsDeviceGnssActive)
         {
@@ -69,43 +47,84 @@ public partial class MapPage : ContentPage, IMapCenterSource
 
     protected override void OnDisappearing()
     {
-        LocationService?.OnLocationUpdated -= OnLocationUpdated;
-        LocationService?.UnregisterMapCenterSource(this);
         base.OnDisappearing();
     }
 
-    private void OnCameraIdle()
+    private void OnCameraIdle(object? sender, EventArgs e)
     {
         if (LocationService is null || LocationService.IsDeviceGnssActive)
         {
             return;
         }
 
+        GPSLocation location = GetMapCenter();
+        UpdateLocationPuck(location);
+    }
+
+    private async void OnCollectVertexClicked(object? sender, EventArgs e)
+    {
+        if (LocationService is null)
+        {
+            return;
+        }
+
         try
         {
-            GPSLocation location = GetMapCenter();
-            UpdateLocationPuck(location);
-            CoordinatesLabel.Text = $"Lat: {location.Latitude:F6}\nLon: {location.Longitude:F6}";
+            CollectVertexButton.IsEnabled = false;
+            GPSData data = await LocationService.CollectVertex();
+            Map.Add(new Pin()
+            {
+                Location = new Location(data.Latitude, data.Longitude),
+                TintColor = Colors.Crimson,
+            });
         }
-        catch (Exception) { }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Vertex Collection Failed", ex.Message, "OK");
+        }
+        finally
+        {
+            CollectVertexButton.IsEnabled = true;
+        }
     }
 
     private async void OnGnssToggled(object? sender, ToggledEventArgs e)
     {
+        bool toggleEnabled = e.Value;
         try
         {
-            if (e.Value) LocationService?.EnableGNSS();
-            else LocationService?.DisableGNSS();
+            if (toggleEnabled)
+            {
+                LocationService?.EnableGNSS();
+                LocationService?.OnLocationUpdated += OnLocationUpdated;
+            }
+            else
+            {
+                LocationService?.DisableGNSS();
+                LocationService?.OnLocationUpdated -= OnLocationUpdated;
+            }
         }
-        catch (InvalidOperationException ex) when (ex.Message == $"GPS provider is not connected. Call {nameof(GPS.Connect)}() first.")
+        catch (Exception)
         {
-            LocationService?.ConnectGPS();
-            if (e.Value) LocationService?.EnableGNSS();
-            else LocationService?.DisableGNSS();
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlertAsync("GNSS", ex.Message, "OK");
+            try
+            {
+                // GNSS might not be connected, so try connecting first before enabling GNSS.
+                LocationService?.ConnectGNSS();
+                if (toggleEnabled)
+                {
+                    LocationService?.EnableGNSS();
+                    LocationService?.OnLocationUpdated += OnLocationUpdated;
+                }
+                else
+                {
+                    LocationService?.DisableGNSS();
+                    LocationService?.OnLocationUpdated -= OnLocationUpdated;
+                }
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlertAsync("GNSS", ex.Message, "OK");
+            }
         }
     }
 
@@ -114,11 +133,11 @@ public partial class MapPage : ContentPage, IMapCenterSource
         MainThread.BeginInvokeOnMainThread(() =>
         {
             UpdateLocationPuck(data);
-            CoordinatesLabel.Text = $"Lat: {data.Latitude:F6}\nLon: {data.Longitude:F6}";
+            CoordinatesLabel.Text = $"Lat: {data.Latitude:F8}\nLon: {data.Longitude:F8}";
         });
     }
 
-    public void UpdateLocationPuck(GPSLocation location)
+    public void UpdateLocationPuck(GPSData data)
     {
         IMapLibreMapController? controller = GetMapController();
         if (controller is null)
@@ -126,71 +145,40 @@ public partial class MapPage : ContentPage, IMapCenterSource
             return;
         }
 
-        var (x, y) = controller.LatLngToScreenPoint(location.Latitude, location.Longitude);
-        if (double.IsNaN(x) || double.IsNaN(y))
+        Location center = new()
         {
-            LocationPuck.IsVisible = false;
-            LocationPuckAccuracyRing.IsVisible = false;
-            return;
-        }
-
-        Location center = new(location.Latitude, location.Longitude);
-
-        double zoom = controller.GetZoom();
-        double latRad = location.Latitude * Math.PI / 180.0;
-        double metersPerPixel = 40075016.686 * Math.Abs(Math.Cos(latRad)) / (512 * Math.Pow(2, zoom));
-        double puckRadiusMeters = PuckDiameterDp / 2.0 * DeviceDisplay.MainDisplayInfo.Density * metersPerPixel;
+            Latitude = data.Latitude,
+            Longitude = data.Longitude,
+            Altitude = data.Altitude,
+            Speed = data.Speed,
+            Course = data.Course,
+            Accuracy = data.EstimatedAccuracy,
+            IsFromMockProvider = data.FixQuality == FixQuality.Simulation,
+            Timestamp = new DateTimeOffset(data.UTC),
+        };
 
         LocationPuck.IsVisible = true;
-        LocationPuck.Center = center;
-        LocationPuck.Radius = Distance.FromMeters(Math.Max(puckRadiusMeters, 0.5));
-
-        LocationPuckAccuracyRing.IsVisible = true;
-        LocationPuckAccuracyRing.Center = center;
-        LocationPuckAccuracyRing.Radius = Distance.FromMeters(MinAccuracyRadiusMeters);
+        LocationPuck.Location = center;
     }
 
-    public void UpdateLocationPuck(GPSData data)
+    public void UpdateLocationPuck(GPSLocation location)
     {
-        Location center = new(data.Latitude, data.Longitude);
-
-        LocationPuck.IsVisible = true;
-        LocationPuck.Center = center;
-        LocationPuck.Radius = Distance.FromMeters(data.EstimatedAccuracy);
-
-        LocationPuckAccuracyRing.IsVisible = true;
-        LocationPuckAccuracyRing.Center = center;
-        LocationPuckAccuracyRing.Radius = Distance.FromMeters(data.EstimatedAccuracy);
-        
-        //UpdatePuckScreenPosition();
+        UpdateLocationPuck(new GPSData(location));
     }
 
     private void ScheduleInitialCamera()
     {
-        //if (_initialCameraApplied)
-        //{
-        //    return;
-        //}
-        //
-        //if (_initialCameraScheduleAttempts++ > 30)
-        //{
-        //    return;
-        //}
-        
-        var controller = GetMapController();
+        IMapLibreMapController? controller = GetMapController();
         if (controller is null)
         {
-            //Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(100), ScheduleInitialCamera);
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(100), ScheduleInitialCamera);
             return;
         }
 
-        //_initialCameraApplied = true;
-        controller.JumpTo(FortCollinsLatitude, FortCollinsLongitude, InitialZoom);
-
-        //if (_lastLocationFix is { } fix)
-        //{
-        //    UpdateLocationPuck(fix, PuckTrackingMode);
-        //}
+        double fortCollinsLatitude = 40.5853;
+        double fortCollinsLongitude = -105.0844;
+        double zoom = 12;
+        controller.JumpTo(fortCollinsLatitude, fortCollinsLongitude, zoom);
     }
 
     private IMapLibreMapController? GetMapController()

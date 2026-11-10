@@ -1,4 +1,5 @@
 using GNSS;
+using GNSS.Nmea;
 using GNSS.Providers;
 
 namespace CartoPac_Mobile.GNSS;
@@ -55,7 +56,11 @@ public sealed class InternalGpsHelper : IInternalGPSHelper
                         location.Latitude,
                         location.Longitude,
                         location.Altitude,
-                        location.Accuracy));
+                        location.Speed,
+                        location.Course,
+                        location.Accuracy,
+                        location.IsFromMockProvider ? FixQuality.Simulation : FixQuality.GPS,
+                        location.Timestamp.DateTime));
                 }
 
                 Source?.Token.WaitHandle.WaitOne(PollInterval);

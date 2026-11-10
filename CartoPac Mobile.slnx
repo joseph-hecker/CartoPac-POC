@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="../GNSS/GNSS.Workflows/GNSS.Workflows.csproj" />
   <Project Path="../GNSS/GNSS/GNSS.csproj" />
   <Project Path="CartoPac Mobile/CartoPac Mobile.csproj" />
 </Solution>

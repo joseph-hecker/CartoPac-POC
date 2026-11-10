@@ -10,16 +10,17 @@
 
     <Grid>
         <maplibre:MapLibreMap x:Name="Map"
-                              StyleUrl="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json">
+                              StyleUrl="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+                              ShowNavigationControls="False"
+                              ShowGpsControl="False">
 
-            <overlays:Circle x:Name="LocationPuck"
+            <overlays:Pin x:Name="LocationPuck"
                              IsVisible="True"
-                             FillColor="DeepSkyBlue"
-                             StrokeColor="DeepSkyBlue"
+                             TintColor="DeepSkyBlue"
                              StrokeWidth="1" />
 
             <overlays:Circle x:Name="LocationPuckAccuracyRing"
-                             IsVisible="True"
+                             IsVisible="False"
                              FillColor="LightSkyBlue"
                              StrokeColor="SkyBlue"
                              StrokeWidth="1" />
@@ -52,6 +53,22 @@
                    HorizontalTextAlignment="Start" />
             
         </VerticalStackLayout>
+
+        <Button x:Name="CollectVertexButton"
+                Text="+"
+                FontSize="28"
+                FontAttributes="Bold"
+                WidthRequest="48"
+                HeightRequest="48"
+                Padding="0"
+                CornerRadius="24"
+                BackgroundColor="#1E88E5"
+                TextColor="White"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                Margin="12"
+                Clicked="OnCollectVertexClicked"
+                SemanticProperties.Description="Collect vertex" />
 
     </Grid>
 

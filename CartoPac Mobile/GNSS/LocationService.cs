@@ -1,4 +1,5 @@
 using GNSS;
+using GNSS.Workflows;
 
 namespace CartoPac_Mobile.GNSS;
 
@@ -12,14 +13,11 @@ public sealed class LocationService
         { ProviderType.TextFile, "Text File" }
     };
 
-    private static GPS _deviceGPS = new();
-    private static GPS _mapGPS = new();
-    private GPS GPS { get; set; } = _mapGPS;
-
-    private IMapCenterSource? MapCenterSource { get; set; }
+    private MapWorkflow MapGPS { get => field ?? throw new InvalidOperationException("Map center source has not been registered yet."); set; }
+    private GNSSWorkflow? DeviceGPS { get; set; }
     private InternalGpsHelper InternalGPSHelper { get; } = new();
 
-    public bool IsDeviceGnssActive { get; set; }
+    public bool IsDeviceGnssActive { get; private set; }
 
     public event GPS.OnLocationUpdatedEventHandler? OnLocationUpdated
     {
@@ -29,27 +27,17 @@ public sealed class LocationService
 
     public void RegisterMapCenterSource(IMapCenterSource source)
     {
-        MapCenterSource = source;
-        _mapGPS.Connect(new MapHelper(() => MapCenterSource.GetMapCenter()));
+        MapGPS = new(source);
     }
 
-    public void UnregisterMapCenterSource(IMapCenterSource source)
-    {
-        _mapGPS.Disconnect();
-        if (ReferenceEquals(MapCenterSource, source))
-        {
-            MapCenterSource = null;
-        }
-    }
-
-    public void ConnectGPS()
+    public void ConnectGNSS()
     {
         ProviderType provider;
         switch (provider = GetLocationProviderSettings(out Dictionary<string, string>? options))
         {
 
             case ProviderType.InternalGPS:
-                _deviceGPS.Connect(InternalGPSHelper);
+                GPS.Connect(InternalGPSHelper);
                 break;
 
             case ProviderType.Bluetooth:
@@ -60,30 +48,43 @@ public sealed class LocationService
                     throw new ArgumentNullException(nameof(options));
                 }
 
-                _deviceGPS.Connect(provider, options);
+                GPS.Connect(provider, options);
                 break;
         }
+
+        DeviceGPS = new StandardGPSWorkflow(ct => Task.CompletedTask);
     }
 
-    public void DisconnectGPS()
+    public void DisconnectGNSS()
     {
-        _deviceGPS.Disconnect();
+        IsDeviceGnssActive = false;
+        DeviceGPS = null;
+        GPS.Disconnect();
     }
 
     public void EnableGNSS()
     {
-        IsDeviceGnssActive = true;
-        _mapGPS.StopUpdatingLocation();
-        _deviceGPS.StartUpdatingLocation();
-        GPS = _deviceGPS;
+        if (DeviceGPS is not null)
+        {
+            IsDeviceGnssActive = true;
+            GPS.StartUpdatingLocation();
+        }
     }
 
     public void DisableGNSS()
     {
         IsDeviceGnssActive = false;
-        _deviceGPS.StopUpdatingLocation();
-        _mapGPS.StartUpdatingLocation();
-        GPS = _mapGPS;
+        GPS.StopUpdatingLocation();
+    }
+
+    public async Task<GPSData> CollectVertex()
+    {
+        if (IsDeviceGnssActive && DeviceGPS is not null)
+        {
+            return await DeviceGPS.CollectVertexAsync();
+        }
+
+        return await MapGPS.CollectVertexAsync();
     }
 
     private static ProviderType GetLocationProviderSettings(out Dictionary<string, string>? providerOptions)

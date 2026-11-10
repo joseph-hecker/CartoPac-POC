@@ -115,7 +115,7 @@ public partial class SettingsPage : ContentPage
     {
         try
         {
-            LocationService?.ConnectGPS();
+            LocationService?.ConnectGNSS();
             await DisplayAlertAsync("GNSS", "Connection was successful.", "OK");
         }
         catch (Exception ex)

@@ -1,6 +1,7 @@
 ﻿using CartoPac_Mobile.GNSS;
 using MapLibreNative.Maui.Handlers;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace CartoPac_Mobile
 {
@@ -8,6 +9,13 @@ namespace CartoPac_Mobile
     {
         public static MauiApp CreateMauiApp()
         {
+            string gnssLogPath = Path.Combine(FileSystem.AppDataDirectory, "gnss.log");
+            
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .WriteTo.File(gnssLogPath, shared: true, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
             var builder = MauiApp.CreateBuilder();
             builder.Services.AddSingleton<LocationService>();
             builder
@@ -22,6 +30,7 @@ namespace CartoPac_Mobile
                     handlers.AddHandler(typeof(MapLibreMap), typeof(MapLibreMapHandler));
                 });
 
+            builder.Logging.AddSerilog(logger: null, dispose: true);
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
